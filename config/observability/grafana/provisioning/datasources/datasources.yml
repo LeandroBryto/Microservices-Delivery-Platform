@@ -1,0 +1,33 @@
+# Configuração automática das Fontes de Dados (Data Sources) do Grafana
+apiVersion: 1
+
+datasources:
+  # Fonte de Dados: Prometheus
+  - name: Prometheus
+    type: prometheus
+    access: proxy # Acessa via backend do Grafana
+    url: http://prometheus:9090 # URL interna do Prometheus no Docker
+    isDefault: true # Define como fonte de dados padrão para métricas
+    jsonData:
+      timeInterval: "15s"
+    editable: true # Permite editar a configuração na UI do Grafana
+
+  # Fonte de Dados: Loki
+  - name: Loki
+    type: loki
+    access: proxy # Acessa via backend do Grafana
+    url: http://loki:3100 # URL interna do Loki no Docker
+    jsonData:
+      # Define campos derivados para extrair labels dos logs (opcional, mas útil)
+      derivedFields:
+        # Extrai traceId e spanId se presentes nos logs (requer configuração no logback)
+        - datasourceUid: loki # Aplica-se a esta fonte Loki
+          matcherRegex: "traceId=(\\w+)"
+          name: TraceID
+          url: '$${__value.raw}' # Link simples, pode ser melhorado com template para Zipkin/Jaeger
+        - datasourceUid: loki
+          matcherRegex: "spanId=(\\w+)"
+          name: SpanID
+          url: '$${__value.raw}'
+    editable: true # Permite editar a configuração na UI do Grafana
+

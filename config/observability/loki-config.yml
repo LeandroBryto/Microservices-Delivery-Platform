@@ -1,0 +1,50 @@
+# Configuração do Loki
+auth_enabled: false # Desabilita autenticação para simplificar
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki # Diretório base para armazenamento de dados do Loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://localhost:9093 # Opcional, se usar Alertmanager
+
+# Configuração para não requerer X-Scope-OrgID (simplifica para single-tenant)
+# Se precisar de multi-tenancy, remova ou ajuste esta seção.
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  chunk_idle_period: 1h       # Tempo que um chunk fica inativo antes de ser "flushed"
+  max_chunk_age: 1h           # Tempo máximo que um chunk fica na memória
+  chunk_target_size: 1048576  # Tamanho alvo para chunks (1MB)
+  chunk_retain_period: 30s    # Tempo para reter chunks após "flush"
+  max_transfer_retries: 0     # Desabilita retentativas
+
+analytics:
+  reporting_enabled: false
+

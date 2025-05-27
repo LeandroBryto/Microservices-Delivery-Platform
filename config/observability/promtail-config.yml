@@ -1,0 +1,56 @@
+# Configuração do Promtail
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0 # Desabilita gRPC se não for necessário
+
+positions:
+  filename: /tmp/positions.yaml # Arquivo para guardar a posição de leitura dos logs
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push # URL do Loki para enviar os logs
+
+scrape_configs:
+  # Configuração para coletar logs dos contêineres Docker
+  - job_name: containers
+    # Usa a descoberta de serviços do Docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock # Caminho para o socket do Docker
+        refresh_interval: 5s
+        filters:
+          # Filtra para incluir apenas os contêineres desta stack (opcional, mas recomendado)
+          # Você pode usar labels definidas no docker-compose.yml
+          - name: label
+            values: ["logging=promtail"]
+    relabel_configs:
+      # Extrai informações úteis dos labels do contêiner Docker como labels do Loki
+      - source_labels: [__meta_docker_container_name]
+        regex: "/(.*)"
+        target_label: "container"
+      - source_labels: [__meta_docker_container_log_stream]
+        target_label: "logstream"
+      - source_labels: [__meta_docker_container_label_service_name]
+        target_label: "service"
+      # Adiciona um label padrão para identificar a origem dos logs
+      - target_label: job
+        replacement: containers
+
+    # Configuração do pipeline de processamento (opcional, mas útil)
+    pipeline_stages:
+      # Tenta parsear a linha de log como JSON
+      - json:
+          expressions:
+            # Mapeia campos do JSON para campos de log (ajuste conforme seu formato JSON)
+            level: level
+            message: message
+            logger: logger_name
+            thread: thread_name
+            # Adicione outros campos que você configurou no LogstashEncoder
+      # Define o timestamp do log a partir do campo '@timestamp' do JSON (se existir)
+      - timestamp:
+          source: timestamp # Nome do campo timestamp no seu JSON (padrão do LogstashEncoder)
+          format: RFC3339Nano
+      # Define os labels principais para indexação no Loki
+      - labels:
+          service: # Usa o label 'service' já extraído do Docker
+          level: # Usa o campo 'level' extraído do JSON
+

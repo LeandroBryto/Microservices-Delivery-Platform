@@ -1,0 +1,37 @@
+# Configuração Global do Prometheus
+global:
+  scrape_interval: 15s # Intervalo padrão para coletar métricas
+  evaluation_interval: 15s # Intervalo para avaliar regras de alerta
+
+# Configuração de Alertas (opcional, pode ser adicionado depois)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           # - alertmanager:9093
+
+# Arquivos de Regras (opcional, pode ser adicionado depois)
+# rule_files:
+#   - "first_rules.yml"
+#   - "second_rules.yml"
+
+# Configuração dos Alvos (Scrape Configurations)
+scrape_configs:
+  # Coleta métricas do próprio Prometheus
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Coleta métricas dos microsserviços da plataforma de entrega
+  - job_name: "delivery-platform-services"
+    metrics_path: /actuator/prometheus # Caminho padrão do Spring Boot Actuator
+    static_configs:
+      # Lista estática dos serviços. Em ambientes mais complexos, usar service discovery.
+      - targets: 
+          - "service-orders:8081"
+          - "service-drivers:8082"
+          - "service-tracking:8083"
+          - "service-notifications:8084"
+        labels:
+          application: "Microservices Delivery Platform"
+

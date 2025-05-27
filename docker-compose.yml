@@ -1,0 +1,221 @@
+version: '3.8'
+
+networks:
+  delivery-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  mongodb_data:
+  rabbitmq_data:
+  prometheus_data: {}
+  grafana_data: {}
+  loki_data: {}
+
+services:
+  #-----------------------------------------------------------
+  # Bancos de Dados e Mensageria
+  #-----------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: orders_db # Banco inicial para service-orders
+    ports:
+      - "3406:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - delivery-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - delivery-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.11-management # Versão mais recente com management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"   # Porta AMQP
+      - "15672:15672" # Porta Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/
+    networks:
+      - delivery-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  #-----------------------------------------------------------
+  # Microsserviços da Aplicação
+  #-----------------------------------------------------------
+  service-orders:
+    build: ./service-orders
+    container_name: service-orders
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker # Perfil para configuração Docker
+      # Configs movidas para application-docker.properties ou gerenciadas centralmente
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - delivery-network
+    labels:
+      - "logging=promtail" # Label para descoberta pelo Promtail
+      - "service_name=service-orders"
+
+  service-drivers:
+    build: ./service-drivers
+    container_name: service-drivers
+    restart: always
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - delivery-network
+    labels:
+      - "logging=promtail"
+      - "service_name=service-drivers"
+
+  service-tracking:
+    build: ./service-tracking
+    container_name: service-tracking
+    restart: always
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - delivery-network
+    labels:
+      - "logging=promtail"
+      - "service_name=service-tracking"
+
+  service-notifications:
+    build: ./service-notifications
+    container_name: service-notifications
+    restart: always
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - delivery-network
+    labels:
+      - "logging=promtail"
+      - "service_name=service-notifications"
+
+  #-----------------------------------------------------------
+  # Stack de Observabilidade (Prometheus + Loki + Grafana)
+  #-----------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.47.2 # Usar uma versão estável
+    container_name: prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --web.console.libraries=/usr/share/prometheus/console_libraries --web.console.templates=/usr/share/prometheus/consoles
+    networks:
+      - delivery-network
+    depends_on:
+      - service-orders
+      - service-drivers
+      - service-tracking
+      - service-notifications
+
+  loki:
+    image: grafana/loki:2.9.2 # Usar uma versão estável
+    container_name: loki
+    restart: always
+    ports:
+      - "3100:3100" # Porta HTTP do Loki
+    volumes:
+      - ./config/observability/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - delivery-network
+
+  promtail:
+    image: grafana/promtail:2.9.2 # Mesma versão do Loki
+    container_name: promtail
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # Acesso ao socket do Docker para descobrir contêineres
+      - ./config/observability/promtail-config.yml:/etc/promtail/config.yml
+      # Volume para guardar a posição de leitura dos logs (opcional, mas útil)
+      # - /tmp/promtail:/tmp 
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - delivery-network
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:10.2.2 # Usar uma versão estável
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      # Provisionamento automático de Data Sources e Dashboards
+      - ./config/observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./config/observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin # Mude em produção!
+      GF_AUTH_ANONYMOUS_ENABLED: true
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      # GF_LOG_LEVEL: debug # Para debug do Grafana
+    networks:
+      - delivery-network
+    depends_on:
+      - prometheus
+      - loki
+

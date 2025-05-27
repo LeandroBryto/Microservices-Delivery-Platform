@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+
+    <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- Encoder JSON para Logstash/Loki -->
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Você pode customizar os campos incluídos aqui se necessário -->
+            <!-- Exemplo: <includeMdcKeyName>traceId</includeMdcKeyName> -->
+            <!-- Exemplo: <includeMdcKeyName>spanId</includeMdcKeyName> -->
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <!-- Redireciona a saída padrão para o encoder JSON -->
+        <appender-ref ref="STDOUT_JSON" />
+    </root>
+
+    <!-- Níveis de log específicos para pacotes da aplicação -->
+    <logger name="com.delivery.orders" level="DEBUG" additivity="false">
+        <appender-ref ref="STDOUT_JSON" />
+    </logger>
+
+    <!-- Níveis de log para bibliotecas comuns (ajuste conforme necessário) -->
+    <logger name="org.springframework" level="INFO" additivity="false">
+         <appender-ref ref="STDOUT_JSON" />
+    </logger>
+    <logger name="org.hibernate" level="INFO" additivity="false">
+         <appender-ref ref="STDOUT_JSON" />
+    </logger>
+    <logger name="org.springframework.amqp" level="INFO" additivity="false">
+         <appender-ref ref="STDOUT_JSON" />
+    </logger>
+
+</configuration>
