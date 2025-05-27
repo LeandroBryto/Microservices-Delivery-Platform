@@ -21,7 +21,7 @@ Esta é a maneira mais simples de rodar o projeto, pois o Docker Compose gerenci
 
 1.  **Clone o Repositório:**
     ```bash
-    git clone <URL_DO_REPOSITORIO> # Substitua pela URL correta
+    git clone https://github.com/LeandroBryto/Microservices-Delivery-Platform.git
     cd microservices-delivery-platform
     ```
 
