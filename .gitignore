@@ -1,0 +1,23 @@
+# Java
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+*.log
+
+
+.idea/
+
+
+
+.mvn/
+!**/src/main/**/.mvn/wrapper/maven-wrapper.jar
+
+
+**/logs/
+**/*.pid
+
+
+.env
