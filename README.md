@@ -66,8 +66,8 @@ Para executar este projeto localmente, você precisará ter instalado:
 
 1.  **Clone ou Baixe o Repositório:**
     ```bash
-    git clone <URL_DO_SEU_REPOSITORIO_GITHUB>
-    cd microservices-delivery-platform
+      git clone https://github.com/LeandroBryto/Microservices-Delivery-Platform.git
+      cd Microservices-Delivery-Platform
     ```
     Ou baixe e descompacte o arquivo ZIP do projeto.
 
