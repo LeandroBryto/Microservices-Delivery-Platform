@@ -60,7 +60,7 @@ Para executar este projeto localmente, você precisará ter instalado:
 3.  **Git:** Para clonar o repositório (opcional, se baixar o ZIP).
 4.  **(Opcional) Ferramenta de API:** Como Postman ou Insomnia para interagir com as APIs REST.
 
-*(Consulte o `OBSERVABILITY_IMPLEMENTATION_GUIDE.md` para comandos de instalação do Docker e Docker Compose no Ubuntu)*
+*(Consulte o `OBSERVABILITY_IMPLEMENTATION_GUIDE.md` para comandos de instalação do Docker e Docker Compose )*
 
 ## Como Executar o Projeto
 
